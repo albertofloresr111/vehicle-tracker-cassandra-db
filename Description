@@ -1,2 +1,208 @@
 # vehicle-tracker-cassandra-db
+
 Servlet java to track vehicle Google Maps - GPS coordinates, latitude and longitude
+
+You should create the following schema in cassandra db
+
+cqlsh> CREATE KEYSPACE vehicle_tracker WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+cqlsh> DESCRIBE KEYSPACES;
+
+system_schema  system           system_distributed
+system_auth    vehicle_tracker  system_traces     
+
+cqlsh> DESCRIBE KEYSPACE vehicle_tracker;
+
+CREATE KEYSPACE vehicle_tracker WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;
+
+cqlsh> DESCRIBE KEYSPACES;
+
+system_schema  system           system_distributed
+system_auth    vehicle_tracker  system_traces     
+
+cqlsh> CREATE KEYSPACE home_security WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+cqlsh> DESCRIBE KEYSPACES;
+
+system_schema  system           home_security       system_traces
+system_auth    vehicle_tracker  system_distributed
+
+cqlsh> USE home_security ;
+cqlsh:home_security> CREATE TABLE activity (
+                 ... home_id text,
+                 ... datetime timestamp,
+                 ... event text,
+                 ... code_used text,
+                 ... PRIMARY KEY (home_id, datetime)
+                 ... ) WITH CLUSTERING ORDER BY (datetime DESC);
+cqlsh:home_security> DESCRIBE TABLE activity;
+
+CREATE TABLE home_security.activity (
+    home_id text,
+    datetime timestamp,
+    code_used text,
+    event text,
+    PRIMARY KEY (home_id, datetime)
+) WITH CLUSTERING ORDER BY (datetime DESC)
+    AND bloom_filter_fp_chance = 0.01
+    AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+    AND comment = ''
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+    AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND crc_check_chance = 1.0
+    AND dclocal_read_repair_chance = 0.1
+    AND default_time_to_live = 0
+    AND gc_grace_seconds = 864000
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = '99PERCENTILE';
+
+cqlsh:home_security> CREATE TABLE home (
+                 ... home_id text,
+                 ... address text,
+                 ... city text,
+                 ... state text,
+                 ... zip text,
+                 ... contact_mame text,
+                 ... phone text,
+                 ... alt_phone text,
+                 ... phone_password text,
+                 ... email text,
+                 ... main_code text,
+                 ... guest_code text,
+                 ... PRIMARY KEY(home_id)
+                 ... );
+cqlsh:home_security> DESCRIBE TABLE home;
+
+CREATE TABLE home_security.home (
+    home_id text PRIMARY KEY,
+    address text,
+    alt_phone text,
+    city text,
+    contact_mame text,
+    email text,
+    guest_code text,
+    main_code text,
+    phone text,
+    phone_password text,
+    state text,
+    zip text
+) WITH bloom_filter_fp_chance = 0.01
+    AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+    AND comment = ''
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+    AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND crc_check_chance = 1.0
+    AND dclocal_read_repair_chance = 0.1
+    AND default_time_to_live = 0
+    AND gc_grace_seconds = 864000
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = '99PERCENTILE';
+
+cqlsh:home_security> exit
+
+
+
+COPY home (home_id, datetime, event, code_used) FROM '/home/aguilas/Documentos/Chapter_7/events.csv' WITH header = true AND delimiter = '|';
+
+
+COPY home (home_id, address, city, state, zip, contact_name, phone, phone_password, email, main_code, guest_code) FROM '/home/aguilas/Documentos/Chapter_7/homes.csv' WITH header = true AND delimiter = '|';
+
+
+INSERT INTO home(home_id, address, city, state, zip, contact_name, phone, phone_password, email, main_code, guest_code) VALUES ('H01474777', '518 Crestview Drive', 'Beverly Hills', 'CA', '90046', 'Jed Clampett', '310-775-4011', 'oil', 'jclampett@bhb.com', '5599', '7778');
+
+
+
+cqlsh> USE home_security;
+cqlsh:home_security> INSERT INTO activity(home_id, datetime, event, code_used) VALUES ('H01474777', '2014-05-21 07:32:16', 'alarm set', '5599');
+cqlsh:home_security> SELECT * FROM activity;
+
+ home_id   | datetime                        | code_used | event
+-----------+---------------------------------+-----------+-----------
+ H01474777 | 2014-05-21 12:32:16.000000+0000 |      5599 | alarm set
+
+(1 rows)
+cqlsh:home_security> SELECT home_id, datetime, event FROM activity;
+
+ home_id   | datetime                        | event
+-----------+---------------------------------+-----------
+ H01474777 | 2014-05-21 12:32:16.000000+0000 | alarm set
+
+(1 rows)
+cqlsh:home_security> COPY activity (home_id, datetime, event, code_used) FROM '/home/aguilas/Documentos/Chapter_7/events.csv' WITH header = true AND delimiter = '|';
+Using 1 child processes
+
+Starting copy of home_security.activity with columns ['home_id', 'datetime', 'event', 'code_used'].
+Processed: 32 rows; Rate:      19 rows/s; Avg. rate:      33 rows/s
+32 rows imported from 1 files in 0.956 seconds (0 skipped).
+cqlsh:home_security> SELECT * FROM activity;
+
+ home_id   | datetime                        | code_used | event
+-----------+---------------------------------+-----------+-----------------------
+ H01474777 | 2014-05-23 12:28:41.000000+0000 |      5599 |      alarm turned off
+ H01474777 | 2014-05-23 01:44:23.000000+0000 |      5599 |             alarm set
+ H01474777 | 2014-05-22 11:22:15.000000+0000 |      5599 |      alarm turned off
+ H01474777 | 2014-05-22 05:44:07.000000+0000 |      null | alarm reset by office
+ H01474777 | 2014-05-22 05:25:00.000000+0000 |      null |         police called
+ H01474777 | 2014-05-22 05:23:59.000000+0000 |      null |        alarm breached
+ H01474777 | 2014-05-22 01:44:13.000000+0000 |      5599 |             alarm set
+ H01474777 | 2014-05-21 12:32:16.000000+0000 |      5599 |             alarm set
+ H01474777 | 2014-05-21 12:30:33.000000+0000 |      5599 |      alarm turned off
+ H01474777 | 2014-05-21 01:32:16.000000+0000 |      5599 |             alarm set
+ H01033638 | 2014-05-22 01:45:28.000000+0000 |      2121 |             alarm set
+ H01033638 | 2014-05-21 13:01:46.000000+0000 |      2121 |      alarm turned off
+ H01033638 | 2014-05-21 10:58:39.000000+0000 |      1919 |             alarm set
+ H01033638 | 2014-05-21 07:02:11.000000+0000 |      1919 |      alarm turned off
+ H01033638 | 2014-05-21 01:55:58.000000+0000 |      2121 |             alarm set
+ H01033638 | 2014-05-21 01:50:43.000000+0000 |      2121 |      alarm turned off
+ H01033638 | 2014-05-21 01:50:22.000000+0000 |      2121 |             alarm set
+ H02257222 | 2014-05-23 12:06:58.000000+0000 |      1566 |      alarm turned off
+ H02257222 | 2014-05-23 01:49:36.000000+0000 |      1566 |             alarm set
+ H02257222 | 2014-05-22 15:59:44.000000+0000 |      1566 |      alarm turned off
+ H02257222 | 2014-05-20 23:29:47.000000+0000 |      1566 |             alarm set
+ H01545551 | 2014-05-23 12:14:53.000000+0000 |      8889 |      alarm turned off
+ H01545551 | 2014-05-23 02:28:16.000000+0000 |      8889 |             alarm set
+ H01545551 | 2014-05-22 12:35:29.000000+0000 |      8889 |      alarm turned off
+ H01545551 | 2014-05-22 02:32:22.000000+0000 |      8889 |             alarm set
+ H01545551 | 2014-05-21 12:41:02.000000+0000 |      8889 |      alarm turned off
+ H01545551 | 2014-05-21 02:30:14.000000+0000 |      8889 |             alarm set
+ H00999943 | 2014-05-23 12:56:23.000000+0000 |      1245 |      alarm turned off
+ H00999943 | 2014-05-23 02:52:19.000000+0000 |      1245 |             alarm set
+ H00999943 | 2014-05-22 13:10:56.000000+0000 |      1245 |      alarm turned off
+ H00999943 | 2014-05-22 02:55:10.000000+0000 |      1245 |             alarm set
+ H00999943 | 2014-05-21 13:03:33.000000+0000 |      1245 |      alarm turned off
+ H00999943 | 2014-05-21 03:05:54.000000+0000 |      1245 |             alarm set
+
+(33 rows)
+cqlsh:home_security> DESCRIBE home;
+
+CREATE TABLE home_security.home (
+    home_id text PRIMARY KEY,
+    address text,
+    alt_phone text,
+    city text,
+    contact_mame text,
+    email text,
+    guest_code text,
+    main_code text,
+    phone text,
+    phone_password text,
+    state text,
+    zip text
+) WITH bloom_filter_fp_chance = 0.01
+    AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+    AND comment = ''
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+    AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND crc_check_chance = 1.0
+    AND dclocal_read_repair_chance = 0.1
+    AND default_time_to_live = 0
+    AND gc_grace_seconds = 864000
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair_chance = 0.0
+    AND speculative_retry = '99PERCENTILE'
